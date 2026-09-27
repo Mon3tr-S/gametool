@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>ゲームアイデア生成</title>
+<style>
+  :root{
+    --bg:#0F1115;
+    --surface:#171A21;
+    --surface-2:#1E222B;
+    --line:#2A2F3A;
+    --text:#E8EAED;
+    --muted:#8B93A3;
+    --accent:#FF5A1F;
+    --accent-dim:#7A2E12;
+    --gold:#E8B54A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    overscroll-behavior:none;
+  }
+
+  /* ---- ヘッダ ---- */
+  header{
+    padding:calc(env(safe-area-inset-top) + 20px) 20px 0;
+    border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--bg);z-index:10;
+  }
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand h1{font-size:17px;font-weight:700;letter-spacing:.02em}
+  .brand span{font-size:11px;color:var(--muted);letter-spacing:.08em}
+
+  .tabs{display:flex;gap:2px;margin-top:14px}
+  .tab{
+    background:none;border:none;color:var(--muted);
+    font-size:13px;font-weight:700;padding:10px 14px;cursor:pointer;
+    border-bottom:2px solid transparent;
+  }
+  .tab.on{color:var(--text);border-bottom-color:var(--accent)}
+
+  .search{display:flex;gap:8px;padding:12px 0 16px}
+  .search input{
+    flex:1;background:var(--surface);border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px;color:var(--text);
+    font-size:15px;outline:none;
+  }
+  .search input::placeholder{color:#5C6473}
+  .search input:focus{border-color:var(--accent-dim)}
+  .search button{
+    background:var(--accent);border:none;border-radius:10px;
+    padding:0 18px;color:#fff;font-size:14px;font-weight:700;
+    white-space:nowrap;cursor:pointer;
+  }
+  .search button:disabled{background:var(--surface-2);color:#5C6473}
+  .search #histBtn{background:var(--surface-2);color:var(--muted);border:1px solid var(--line);font-weight:500}
+  .search.hidden{display:none}
+
+  /* ---- 一覧 ---- */
+  main{padding:18px 20px calc(env(safe-area-inset-bottom) + 40px)}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
+  @media(min-width:640px){.grid{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:960px){.grid{grid-template-columns:repeat(5,1fr)}}
+
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:13px;
+    padding:14px;cursor:pointer;position:relative;overflow:hidden;
+    display:flex;flex-direction:column;min-height:132px;
+    transition:border-color .15s,transform .08s;
+  }
+  .card:active{transform:scale(.975);border-color:var(--accent)}
+  .card .no{
+    font-size:10px;color:var(--muted);letter-spacing:.1em;margin-bottom:8px;
+  }
+  .card .ttl{font-size:15px;font-weight:700;line-height:1.35;margin-bottom:7px}
+  .card .cmb{font-size:11px;color:var(--accent);line-height:1.4;margin-bottom:7px}
+  .card .dsc{font-size:11px;color:var(--muted);line-height:1.5;flex:1}
+  .card .play{
+    margin-top:10px;font-size:11px;color:var(--muted);
+    display:flex;align-items:center;gap:5px;
+  }
+  .card .play::before{content:"";width:0;height:0;border-left:7px solid var(--accent);border-top:4.5px solid transparent;border-bottom:4.5px solid transparent}
+
+  /* ---- 保存済みカード ---- */
+  .card .date{font-size:10px;color:var(--muted);margin-top:10px}
+  .badge{
+    display:inline-block;font-size:10px;font-weight:700;
+    color:var(--gold);border:1px solid var(--gold);border-radius:5px;
+    padding:2px 6px;margin-bottom:7px;align-self:flex-start;
+  }
+  .card .del{
+    position:absolute;top:8px;right:8px;
+    background:var(--surface-2);border:1px solid var(--line);border-radius:7px;
+    color:var(--muted);font-size:12px;line-height:1;
+    padding:6px 8px;cursor:pointer;
+  }
+  .card .del:active{color:#fff;border-color:#B33}
+
+  /* ---- 空・読み込み ---- */
+  .msg{text-align:center;padding:70px 20px;color:var(--muted);font-size:13px;line-height:1.9}
+  .spinner{
+    width:26px;height:26px;margin:0 auto 18px;
+    border:2.5px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---- プレイ画面 ---- */
+  #player{
+    position:fixed;inset:0;background:#000;z-index:100;
+    display:none;flex-direction:column;
+  }
+  #player.on{display:flex}
+  .pbar{
+    background:var(--surface);border-bottom:1px solid var(--line);
+    padding:calc(env(safe-area-inset-top) + 10px) 12px 8px;
+  }
+  .prow{display:flex;align-items:center;gap:8px}
+  .prow + .prow{margin-top:8px}
+  .pbar button{
+    background:none;border:1px solid var(--line);border-radius:8px;
+    color:var(--text);padding:7px 12px;font-size:13px;cursor:pointer;
+    white-space:nowrap;
+  }
+  .pbar .pt{font-size:14px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pbar #pflag{
+    display:none;font-size:10px;font-weight:700;color:var(--gold);
+    border:1px solid var(--gold);border-radius:5px;padding:2px 6px;white-space:nowrap;
+  }
+  .pbar #pflag.on{display:inline-block}
+  #actions{display:none}
+  #actions.on{display:flex}
+  #refineModel{
+    background:var(--surface-2);border:1px solid var(--line);border-radius:8px;
+    color:var(--text);padding:7px 8px;font-size:13px;
+  }
+  .pbar #refine{border-color:var(--accent-dim);color:var(--accent);font-weight:700}
+  .pbar #fixBtn{font-weight:700}
+  .pbar #undoBtn{display:none;color:var(--muted)}
+  .pbar #undoBtn.on{display:block}
+  #vbar #vtext{font-size:12px;color:var(--muted);flex:1;line-height:1.5;overflow:hidden}
+  #vbar #vfixBtn{border-color:var(--accent-dim);color:var(--accent);font-weight:700}
+  .pbar button:disabled{color:#5C6473;border-color:var(--line)}
+  #frame{flex:1;width:100%;border:none;background:#000}
+  .ploading{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px}
+
+  /* ---- 修正パネル ---- */
+  #fixPanel{
+    display:none;position:absolute;left:0;right:0;bottom:0;z-index:110;
+    background:var(--surface);border-top:1px solid var(--line);
+    padding:12px 14px calc(env(safe-area-inset-bottom) + 12px);
+  }
+  #fixPanel.on{display:block}
+  #fixInput{
+    width:100%;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px;color:var(--text);
+    font-size:14px;outline:none;resize:none;height:60px;
+    font-family:inherit;
+  }
+  #fixInput::placeholder{color:#5C6473}
+  .fixrow{display:flex;gap:8px;margin-top:8px;align-items:center}
+  .fixrow button{
+    border:1px solid var(--line);border-radius:8px;background:none;
+    color:var(--text);padding:8px 14px;font-size:13px;cursor:pointer;white-space:nowrap;
+  }
+  .fixrow #fixSend{background:var(--accent);border:none;color:#fff;font-weight:700}
+  .fixrow #fixSend:disabled{background:var(--surface-2);color:#5C6473}
+  #fixStatus{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6;min-height:1em}
+
+  /* ---- 言語チェック（LQA）パネル ---- */
+  #lqaPanel{
+    display:none;position:absolute;inset:0;z-index:120;
+    background:var(--bg);flex-direction:column;
+  }
+  #lqaPanel.on{display:flex}
+  #lqaHead{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:calc(env(safe-area-inset-top) + 12px) 14px 10px;
+    border-bottom:1px solid var(--line);background:var(--surface);
+  }
+  #lqaTitle{font-size:14px;font-weight:700}
+  #lqaHead button{
+    background:none;border:1px solid var(--line);border-radius:8px;
+    color:var(--text);padding:7px 12px;font-size:13px;cursor:pointer;white-space:nowrap;
+  }
+  #lqaHead #lqaFix{border-color:var(--accent-dim);color:var(--accent);font-weight:700}
+  #lqaBody{flex:1;overflow-y:auto;padding:14px 16px calc(env(safe-area-inset-bottom) + 20px);font-size:13px;line-height:1.6}
+  .lqaLoc{margin-bottom:18px}
+  .lqaLoc h4{font-size:13px;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+  .lqaLoc h4 .cnt{font-size:12px;color:var(--accent);font-weight:700}
+  .lqaLoc h4 .ok{color:var(--gold)}
+  .lqaItem{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+  .lqaItem .hd{font-weight:700;font-size:12.5px}
+  .lqaItem .nums{font-size:12px;color:var(--muted);margin:3px 0 6px;font-variant-numeric:tabular-nums}
+  .lqaItem .nums b{color:var(--red)}
+  .lqaItem ol{margin:0;padding-left:18px;color:var(--muted);font-size:11.5px;line-height:1.7}
+  .lqaUntr{font-size:12px;color:var(--muted);margin-top:4px}
+  .lqaUntr span{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>ゲームアイデア生成</h1>
+    <span>PROTOTYPE</span>
+  </div>
+  <div class="tabs">
+    <button class="tab on" id="tabIdeas">アイデア</button>
+    <button class="tab" id="tabSaved">保存済み</button>
+  </div>
+  <div class="search" id="searchRow">
+    <input id="theme" type="text" placeholder="テーマ（空欄可）">
+    <button id="go">10案出す</button>
+    <button id="histBtn">履歴</button>
+  </div>
+</header>
+
+<main>
+  <div id="list">
+    <div class="msg">
+      テーマを入れて「10案出す」を押すと、<br>
+      テーマ × 対象の掛け合わせが並びます。<br>
+      カードをタップすると、その場で遊べます。
+    </div>
+  </div>
+</main>
+
+<div id="player">
+  <div class="pbar">
+    <div class="prow">
+      <button id="back">← 戻る</button>
+      <div class="pt" id="ptitle"></div>
+      <span id="pflag"></span>
+    </div>
+    <div class="prow" id="actions">
+      <select id="refineModel">
+        <option value="sonnet" selected>Sonnet</option>
+        <option value="opus">Opus</option>
+        <option value="fable">Fable</option>
+      </select>
+      <button id="refine">作り込む</button>
+      <button id="fixBtn">修正する</button>
+      <button id="verifyBtn">検証</button>
+      <button id="lqaBtn">言語チェック</button>
+      <button id="undoBtn">元に戻す</button>
+    </div>
+    <div class="prow" id="vbar" style="display:none">
+      <div id="vtext"></div>
+      <button id="vfixBtn" style="display:none">AIに修正させる</button>
+    </div>
+  </div>
+  <div class="ploading" id="ploading">
+    <div class="spinner"></div>
+    <div class="msg" style="padding:0">生成中… 30秒ほどかかります</div>
+  </div>
+  <iframe id="frame" style="display:none"></iframe>
+
+  <div id="fixPanel">
+    <textarea id="fixInput" placeholder="例：ジャンプが重い、敵が速すぎる、当たり判定が広い"></textarea>
+    <div class="fixrow">
+      <button id="fixSend">送信</button>
+      <button id="fixClose">閉じる</button>
+    </div>
+    <div id="fixStatus"></div>
+  </div>
+
+  <div id="lqaPanel">
+    <div id="lqaHead">
+      <span id="lqaTitle">言語チェック（ローカライズ検証）</span>
+      <div style="display:flex;gap:8px">
+        <button id="lqaFix" style="display:none">AIに直させる</button>
+        <button id="lqaClose">閉じる</button>
+      </div>
+    </div>
+    <div id="lqaBody"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const cache = {};          // 「回のキー:カード番号」 → {html, id}
+let view = 'ideas';        // 'ideas' | 'saved'
+let lastIdeas = null;
+let roundKey = '';         // 表示中のアイデアがどの回のものか（キャッシュの混線防止）
+let current = null;        // プレイ中のゲーム {id, title, refined, refineModel, html, canUndo}
+let refineTimer = null;
+let playToken = 0;         // プレイ画面を閉じた後に古い応答でUIを触らないための世代番号
+
+const REFINE_COST = {sonnet: '目安 $0.15前後', opus: '目安 $0.4〜0.5', fable: '目安 $0.5〜1'};
+
+async function req(url, opt){
+  const r = await fetch(url, opt);
+  const d = await r.json().catch(()=>({detail:'応答の解析に失敗しました'}));
+  if(!r.ok) throw new Error(d.detail || '通信に失敗しました');
+  return d;
+}
+const post = (url, body) => req(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body||{})});
+const get  = url => req(url);
+const del  = url => req(url, {method:'DELETE'});
+
+function showMsg(html){
+  $('#list').innerHTML = `<div class="msg">${html}</div>`;
+}
+
+function refineLabel(meta){
+  if(!meta || !meta.refined) return '';
+  if(meta.refine_model === 'opus') return '作り込み済み・Opus';
+  if(meta.refine_model === 'sonnet') return '作り込み済み・Sonnet';
+  if(meta.refine_model === 'fable') return '作り込み済み・Fable';
+  return '作り込み済み';
+}
+
+/* ---- タブ ---- */
+function setView(v){
+  view = v;
+  $('#tabIdeas').classList.toggle('on', v === 'ideas');
+  $('#tabSaved').classList.toggle('on', v === 'saved');
+  $('#searchRow').classList.toggle('hidden', v !== 'ideas');
+  if(v === 'ideas'){
+    if(lastIdeas) render(lastIdeas);
+    else showMsg('テーマを入れて「10案出す」を押すと、<br>テーマ × 対象の掛け合わせが並びます。<br>カードをタップすると、その場で遊べます。');
+  }else{
+    loadSaved();
+  }
+}
+$('#tabIdeas').onclick = () => setView('ideas');
+$('#tabSaved').onclick = () => setView('saved');
+
+/* ---- アイデア一覧 ---- */
+async function loadIdeas(){
+  const btn = $('#go');
+  btn.disabled = true;
+  $('#list').innerHTML = `<div class="msg"><div class="spinner"></div>考えています…</div>`;
+  try{
+    const d = await post('/api/ideas', {theme: $('#theme').value});
+    lastIdeas = d.ideas;
+    roundKey = d.at || String(Date.now());
+    render(d.ideas);
+  }catch(e){
+    showMsg(`生成に失敗しました<br><span style="color:#5C6473">${e.message}</span>`);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function render(ideas){
+  const g = document.createElement('div');
+  g.className = 'grid';
+  ideas.forEach((it, i) => {
+    const c = document.createElement('div');
+    c.className = 'card';
+    c.innerHTML = `
+      <div class="no">${String(i+1).padStart(2,'0')}</div>
+      <div class="ttl"></div>
+      <div class="cmb"></div>
+      <div class="dsc"></div>
+      <div class="play">遊ぶ</div>`;
+    c.querySelector('.ttl').textContent = it.title || '';
+    c.querySelector('.cmb').textContent = it.combo || '';
+    c.querySelector('.dsc').textContent = it.desc || '';
+    c.onclick = () => play(it, i);
+    g.appendChild(c);
+  });
+  $('#list').innerHTML = '';
+  $('#list').appendChild(g);
+}
+
+/* ---- アイデア履歴 ---- */
+async function showHistory(){
+  setView('ideas');
+  $('#list').innerHTML = `<div class="msg"><div class="spinner"></div>履歴を読み込み中…</div>`;
+  try{
+    const d = await get('/api/ideas/history');
+    if(!d.rounds.length){
+      showMsg('アイデアの履歴はまだありません。');
+      return;
+    }
+    const g = document.createElement('div');
+    g.className = 'grid';
+    d.rounds.forEach(rd => {
+      const c = document.createElement('div');
+      c.className = 'card';
+      c.innerHTML = `
+        <div class="no"></div>
+        <div class="ttl"></div>
+        <div class="dsc"></div>
+        <div class="play">この10案を開く</div>`;
+      c.querySelector('.no').textContent = rd.at || '';
+      c.querySelector('.ttl').textContent = rd.theme ? ('テーマ: ' + rd.theme) : 'テーマなし';
+      c.querySelector('.dsc').textContent = (rd.ideas || []).map(i => i.title).join(' / ');
+      c.onclick = () => {
+        lastIdeas = rd.ideas || [];
+        roundKey = rd.at || '';
+        $('#theme').value = rd.theme || '';
+        render(lastIdeas);
+      };
+      g.appendChild(c);
+    });
+    $('#list').innerHTML = '';
+    $('#list').appendChild(g);
+  }catch(e){
+    showMsg(`履歴の読み込みに失敗しました<br><span style="color:#5C6473">${e.message}</span>`);
+  }
+}
+$('#histBtn').onclick = showHistory;
+
+/* ---- 保存済み一覧 ---- */
+async function loadSaved(){
+  $('#list').innerHTML = `<div class="msg"><div class="spinner"></div>読み込み中…</div>`;
+  try{
+    const d = await get('/api/saved');
+    renderSaved(d.games);
+  }catch(e){
+    showMsg(`読み込みに失敗しました<br><span style="color:#5C6473">${e.message}</span>`);
+  }
+}
+
+function renderSaved(games){
+  if(!games.length){
+    showMsg('保存済みのゲームはまだありません。<br>アイデアから生成すると、自動でここに保存されます。');
+    return;
+  }
+  const g = document.createElement('div');
+  g.className = 'grid';
+  games.forEach(meta => {
+    const c = document.createElement('div');
+    c.className = 'card';
+    const label = refineLabel(meta);
+    c.innerHTML = `
+      ${label ? '<div class="badge"></div>' : ''}
+      <div class="ttl"></div>
+      <div class="cmb"></div>
+      <div class="date"></div>
+      <div class="play">遊ぶ</div>
+      <button class="del">✕</button>`;
+    if(label) c.querySelector('.badge').textContent = label;
+    c.querySelector('.ttl').textContent = meta.title || '';
+    c.querySelector('.cmb').textContent = meta.combo || '';
+    c.querySelector('.date').textContent = meta.created_at || '';
+    c.onclick = () => playSaved(meta);
+    c.querySelector('.del').onclick = async ev => {
+      ev.stopPropagation();
+      if(!confirm(`「${meta.title}」を削除しますか？`)) return;
+      try{
+        await del('/api/saved/' + meta.id);
+        loadSaved();
+      }catch(e){
+        alert('削除に失敗しました: ' + e.message);
+      }
+    };
+    g.appendChild(c);
+  });
+  $('#list').innerHTML = '';
+  $('#list').appendChild(g);
+}
+
+/* ---- プレイ ---- */
+function openPlayer(title){
+  playToken++;
+  $('#player').classList.add('on');
+  $('#ptitle').textContent = title || '';
+  $('#pflag').classList.remove('on');
+  $('#actions').classList.remove('on');
+  closeFixPanel();
+  hideVbar();
+  $('#lqaPanel').classList.remove('on');
+  return playToken;
+}
+
+function showGame(html){
+  $('#ploading').style.display = 'none';
+  const frame = $('#frame');
+  frame.style.display = 'block';
+  frame.srcdoc = html;
+}
+
+function showLoading(inner){
+  $('#frame').style.display = 'none';
+  const load = $('#ploading');
+  load.style.display = 'flex';
+  load.innerHTML = inner;
+}
+
+function updatePbar(){
+  const flag = $('#pflag');
+  const label = current ? refineLabel({refined: current.refined, refine_model: current.refineModel}) : '';
+  flag.textContent = label;
+  flag.classList.toggle('on', !!label);
+  $('#actions').classList.toggle('on', !!(current && current.id));
+  $('#undoBtn').classList.toggle('on', !!(current && current.canUndo));
+}
+
+async function play(idea, idx){
+  const token = openPlayer(idea.title);
+  const ck = roundKey + ':' + idx;
+
+  if(cache[ck]){
+    current = {id: cache[ck].id, title: idea.title, refined: false, refineModel: '', html: cache[ck].html, canUndo: cache[ck].canUndo || false};
+    updatePbar();
+    showGame(cache[ck].html);
+    return;
+  }
+
+  showLoading(`<div class="spinner"></div><div class="msg" style="padding:0">生成中… 30秒ほどかかります</div>`);
+  try{
+    const d = await post('/api/game', idea);
+    cache[ck] = {html: d.html, id: d.id};
+    if(token !== playToken) return;
+    current = {id: d.id, title: idea.title, refined: false, refineModel: '', html: d.html, canUndo: false};
+    updatePbar();
+    showGame(d.html);
+  }catch(e){
+    if(token !== playToken) return;
+    showLoading(`<div class="msg" style="padding:0">生成に失敗しました<br><span style="color:#5C6473">${e.message}</span></div>`);
+  }
+}
+
+async function playSaved(meta){
+  const token = openPlayer(meta.title);
+  showLoading(`<div class="spinner"></div><div class="msg" style="padding:0">読み込み中…</div>`);
+  try{
+    const d = await get('/api/saved/' + meta.id);
+    if(token !== playToken) return;
+    current = {id: meta.id, title: meta.title, refined: d.meta.refined, refineModel: d.meta.refine_model || '', html: d.html, canUndo: d.can_undo};
+    updatePbar();
+    showGame(d.html);
+  }catch(e){
+    if(token !== playToken) return;
+    showLoading(`<div class="msg" style="padding:0">読み込みに失敗しました<br><span style="color:#5C6473">${e.message}</span></div>`);
+  }
+}
+
+/* ---- 作り込む ---- */
+async function refine(){
+  if(!current || !current.id) return;
+  const model = $('#refineModel').value;
+  const name = {sonnet: 'Sonnet', opus: 'Opus', fable: 'Fable'}[model] || model;
+  const est = model === 'fable' ? '3〜8分' : '1〜3分';
+  if(!confirm(`${name}で作り込みますか？\n（${est}かかります・${REFINE_COST[model]}・別の版として保存されます）`)) return;
+
+  const token = playToken;
+  const prevHtml = current.html;
+  $('#refine').disabled = true;
+
+  showLoading(`<div class="spinner"></div><div class="msg" style="padding:0">${name}で作り込み中… ${est}かかります<br><span id="elapsed" style="color:#5C6473">0:00</span></div>`);
+  const t0 = Date.now();
+  clearInterval(refineTimer);
+  refineTimer = setInterval(() => {
+    const el = $('#elapsed');
+    if(!el){ clearInterval(refineTimer); return; }
+    const s = Math.floor((Date.now() - t0) / 1000);
+    el.textContent = `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  }, 1000);
+
+  try{
+    const d = await post('/api/refine/' + current.id, {model});
+    if(token !== playToken) return;
+    // 別の版として保存されるので、プレイ対象を新しい版に切り替える
+    current = {id: d.meta.id, title: d.meta.title, refined: true, refineModel: d.meta.refine_model, html: d.html, canUndo: false};
+    updatePbar();
+    showGame(d.html);
+    runVerification();  // 作り込み後は自動でエラー検証
+  }catch(e){
+    if(token !== playToken) return;
+    alert('作り込みに失敗しました: ' + e.message);
+    showGame(prevHtml);  // 元の版に戻す
+  }finally{
+    clearInterval(refineTimer);
+    $('#refine').disabled = false;
+  }
+}
+$('#refine').onclick = refine;
+
+/* ---- 修正する ---- */
+function closeFixPanel(){
+  $('#fixPanel').classList.remove('on');
+}
+$('#fixBtn').onclick = () => {
+  const p = $('#fixPanel');
+  p.classList.toggle('on');
+  if(p.classList.contains('on')){
+    $('#fixStatus').textContent = '';
+    $('#fixInput').focus();
+  }
+};
+$('#fixClose').onclick = closeFixPanel;
+
+function fixStatus(text){
+  $('#fixStatus').textContent = text;
+}
+
+async function sendFix(){
+  if(!current || !current.id) return;
+  const text = $('#fixInput').value.trim();
+  if(!text){ fixStatus('修正内容を入力してください。'); return; }
+
+  const token = playToken;
+  const btn = $('#fixSend');
+  btn.disabled = true;
+  fixStatus('判定中…');
+
+  try{
+    const d = await post('/api/fix/' + current.id, {request: text});
+    if(token !== playToken) return;
+
+    if(d.type === 'light'){
+      const keys = Object.keys(d.applied || {});
+      if(!keys.length){
+        fixStatus('変更できる項目が見つかりませんでした。表現を変えて試すか、構造の変更として依頼してください。');
+      }else{
+        current.html = d.html;
+        current.canUndo = true;
+        updatePbar();
+        $('#frame').srcdoc = d.html;
+        const detail = keys.map(k => `${k} → ${JSON.stringify(d.applied[k])}`).join('、');
+        fixStatus(`数値を調整しました（${detail}）。続けて修正できます。`);
+        $('#fixInput').value = '';
+      }
+    }else{
+      // 構造の変更 → コスト確認を挟む
+      if(!confirm(`これは構造の変更なので、コストがかかります（目安 $0.1前後・30秒〜1分）。\n\n判定理由: ${d.reason}\n\n実行しますか？`)){
+        fixStatus('キャンセルしました。');
+      }else{
+        fixStatus('作り直し中… 30秒〜1分かかります');
+        const h = await post('/api/fix/' + current.id + '/heavy', {request: text});
+        if(token !== playToken) return;
+        current.html = h.html;
+        current.canUndo = true;
+        updatePbar();
+        $('#frame').srcdoc = h.html;
+        fixStatus('作り直しました。続けて修正できます。');
+        $('#fixInput').value = '';
+        runVerification();  // 構造変更後は自動でエラー検証
+      }
+    }
+  }catch(e){
+    if(token !== playToken) return;
+    fixStatus('失敗しました: ' + e.message);
+  }finally{
+    btn.disabled = false;
+  }
+}
+$('#fixSend').onclick = sendFix;
+
+/* ---- 検証（非表示iframeで自動入力し、実行時エラーを収集） ---- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let verifying = false;
+let lastErrors = [];
+
+function showVbar(text, canFix){
+  $('#vbar').style.display = 'flex';
+  $('#vtext').textContent = text;
+  $('#vfixBtn').style.display = canFix ? 'block' : 'none';
+}
+function hideVbar(){
+  $('#vbar').style.display = 'none';
+  lastErrors = [];
+}
+
+function injectVerifyHook(html){
+  const hook = `<script>(function(){function send(m){try{parent.postMessage({__verify:true,msg:String(m).slice(0,300)},'*')}catch(e){}}
+window.onerror=function(m,s,l,c){send(m+' @'+(l||'?')+':'+(c||'?'));return false;};
+window.addEventListener('unhandledrejection',function(ev){send('Promise: '+ev.reason)});
+var ce=console.error;console.error=function(){send(Array.prototype.slice.call(arguments).join(' '));ce.apply(console,arguments)};})();<\/script>`;
+  if(/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, m => m + hook);
+  return hook + html;
+}
+
+async function runVerification(){
+  if(!current || !current.html || verifying) return;
+  verifying = true;
+  const token = playToken;
+  lastErrors = [];
+  showVbar('検証中… 自動入力でエラーを探しています（約8秒）', false);
+
+  const fr = document.createElement('iframe');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:320px;height:560px;opacity:0;pointer-events:none;border:0;z-index:-1';
+  const onMsg = ev => {
+    const d = ev.data;
+    if(d && d.__verify === true && typeof d.msg === 'string'){
+      if(lastErrors.length < 10 && !lastErrors.includes(d.msg)) lastErrors.push(d.msg);
+    }
+  };
+  window.addEventListener('message', onMsg);
+  document.body.appendChild(fr);
+  fr.srcdoc = injectVerifyHook(current.html);
+  await Promise.race([new Promise(r => fr.onload = r), sleep(3000)]);
+
+  const keys = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '];
+  const t0 = Date.now();
+  while(Date.now() - t0 < 8000){
+    try{
+      const doc = fr.contentDocument, w = fr.contentWindow;
+      if(doc && doc.body){
+        const x = Math.random() * 300, y = Math.random() * 540;
+        let tgt = doc.elementFromPoint(x, y);
+        if(!tgt || tgt === doc.documentElement) tgt = doc.body;  // html要素に当たるとbodyのリスナーに届かない
+        const opts = {bubbles: true, cancelable: true, clientX: x, clientY: y, view: w};
+        tgt.dispatchEvent(new w.MouseEvent('mousedown', opts));
+        await sleep(60 + Math.random() * 120);
+        tgt.dispatchEvent(new w.MouseEvent('mousemove', Object.assign({}, opts, {clientX: x + Math.random()*120 - 60, clientY: y + Math.random()*120 - 60})));
+        tgt.dispatchEvent(new w.MouseEvent('mouseup', opts));
+        tgt.dispatchEvent(new w.MouseEvent('click', opts));
+        const k = keys[Math.floor(Math.random() * keys.length)];
+        doc.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true}));
+        await sleep(60);
+        doc.dispatchEvent(new w.KeyboardEvent('keyup', {key: k, bubbles: true}));
+      }
+    }catch(e){ /* iframe側の例外は無視（エラー自体はフックが拾う） */ }
+    await sleep(120);
+  }
+  window.removeEventListener('message', onMsg);
+  fr.remove();
+  verifying = false;
+  if(token !== playToken) return;  // 検証中に画面を離れた
+
+  // 結果をサーバーに記録（層2: 作り込み・構造修正のプロンプトに制約として注入される）
+  if(current && current.id){
+    try{ await post('/api/saved/' + current.id + '/issues', {issues: lastErrors}); }catch(e){}
+  }
+  if(lastErrors.length){
+    showVbar(`検証でエラー ${lastErrors.length}件: ${lastErrors[0]}`, true);
+  }else{
+    showVbar('検証OK: 8秒間の自動入力でエラーは検出されませんでした', false);
+  }
+}
+$('#verifyBtn').onclick = runVerification;
+
+async function runDebugFix(){
+  if(!current || !current.id || !lastErrors.length || verifying) return;
+  const token = playToken;
+  const errors = lastErrors.slice();
+  $('#vfixBtn').style.display = 'none';
+  showVbar('エラーを修復中… 30秒〜1分かかります', false);
+  try{
+    const d = await post('/api/fix/' + current.id + '/debug', {errors});
+    if(token !== playToken) return;
+    current.html = d.html;
+    current.canUndo = true;
+    updatePbar();
+    $('#frame').srcdoc = d.html;
+    showVbar('修復しました。再検証します…', false);
+    runVerification();  // 修復後に1回だけ自動で再検証（さらに直すかは利用者が選ぶ）
+  }catch(e){
+    if(token !== playToken) return;
+    showVbar('修復に失敗: ' + e.message, true);
+  }
+}
+$('#vfixBtn').onclick = runDebugFix;
+
+/* ---- 言語チェック（ローカライズ検証 / LQA） ---- */
+let lqaIssues = [];   // AI修復に渡す、はみ出し要素（要素ごとに最悪ケースを1件）
+let lqaRunning = false;
+
+function esc(s){ return String(s).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+
+function buildPseudoLong(win){
+  const base = win.__i18n.strings('en') || {};
+  const ja = win.__i18n.strings('ja') || {};
+  const out = {};
+  win.__i18n.keys().forEach(k => {
+    let s = (base[k] != null) ? base[k] : (ja[k] || '');
+    if(!s || /[<>]/.test(s)){ out[k] = s; return; }   // HTML含みはそのまま
+    const target = Math.ceil(s.length * 1.4);
+    let r = s;
+    while(r.length < target) r += s;
+    out[k] = r.slice(0, target);
+  });
+  return out;
+}
+
+function measureSpecs(win, doc, mc){
+  const list = [];
+  const btn = doc.getElementById('btn');
+  if(btn && btn.clientWidth > 0){
+    const w = (btn.firstChild && btn.firstChild.nodeValue || '').trim();
+    list.push({el: btn, label: '「打ち明ける」ボタン（円）', text: w, boxPad: 20});
+  }
+  [['staLbl','HUD見出し（スタミナ）'],['hbLbl','HUD見出し（鼓動）'],['toldLbl','HUD見出し（人数）']].forEach(p => {
+    const e = doc.getElementById(p[0]);
+    if(e && e.clientWidth > 0) list.push({el: e, label: p[1], text: e.textContent});
+  });
+  doc.querySelectorAll('.mbtn .mn').forEach(e => {
+    if(e.clientWidth > 0) list.push({el: e, label: 'モード名ボタン', text: e.textContent});
+  });
+  const out = [];
+  list.forEach(sp => {
+    const cs = win.getComputedStyle(sp.el);
+    mc.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    const need = Math.round(mc.measureText(sp.text).width);
+    const pad = sp.boxPad != null ? sp.boxPad
+      : (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    const box = Math.round(sp.el.clientWidth - pad);
+    out.push({label: sp.label, text: sp.text, need: need, box: box, over: need - box,
+      font: Math.round(parseFloat(cs.fontSize)), pad: Math.round(sp.boxPad != null ? sp.boxPad : pad)});
+  });
+  return out;
+}
+
+async function runLocaleCheck(){
+  if(!current || !current.html || lqaRunning) return;
+  lqaRunning = true;
+  const token = playToken;
+  lqaIssues = [];
+  $('#lqaFix').style.display = 'none';
+  $('#lqaBody').innerHTML = '<div class="msg" style="padding:30px 0">検証中… 各言語で表示幅を計測しています</div>';
+  $('#lqaPanel').classList.add('on');
+
+  const fr = document.createElement('iframe');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:320px;height:560px;opacity:0;pointer-events:none;border:0;z-index:-1';
+  document.body.appendChild(fr);
+  fr.srcdoc = current.html;
+  await Promise.race([new Promise(r => fr.onload = r), sleep(3000)]);
+  await sleep(200);
+
+  let report = [];
+  try{
+    const win = fr.contentWindow, doc = fr.contentDocument;
+    if(!win.__i18n){
+      $('#lqaBody').innerHTML = '<div class="msg" style="padding:30px 0">このゲームは多言語対応（STRINGS / __i18n）ではないため、言語チェックできません。<br>新しく生成／作り込みしたゲームには対応が入ります。</div>';
+      fr.remove(); lqaRunning = false; return;
+    }
+    const mc = doc.createElement('canvas').getContext('2d');
+    const ja = win.__i18n.strings('ja') || {};
+    const SAME_OK = {scoreWord: 1};
+    const locales = [
+      {code:'de', name:'ドイツ語', type:'real'},
+      {code:'en', name:'英語', type:'real'},
+      {code:'zh', name:'中国語', type:'real'},
+      {code:'ko', name:'韓国語', type:'real'},
+      {code:'long', name:'擬似ロケール long（1.4倍）', type:'long'},
+      {code:'missing', name:'擬似ロケール missing（未翻訳テスト）', type:'missing'}
+    ];
+    const worst = {};   // label → 最悪の item（AI修復用）
+    for(const loc of locales){
+      let untranslated = [];
+      if(loc.type === 'real') win.__i18n.setLang(loc.code);
+      else if(loc.type === 'long') win.__i18n.setPseudo(buildPseudoLong(win));
+      else {  // missing: 一部を意図的に未翻訳（＝日本語のまま）にして、検出できるか試す
+        const en = win.__i18n.strings('en') || {};
+        const tbl = {};
+        win.__i18n.keys().forEach(k => {
+          if(Math.random() < 0.3) tbl[k] = ja[k];
+          else tbl[k] = (en[k] != null ? en[k] : ja[k]);
+        });
+        win.__i18n.setPseudo(tbl);
+        untranslated = win.__i18n.keys().filter(k => !SAME_OK[k] && tbl[k] === ja[k]).slice(0, 8);
+      }
+      await sleep(50);
+      const items = (loc.type === 'missing') ? [] : measureSpecs(win, doc, mc).filter(it => it.over > 1);
+      items.forEach(it => {
+        const key = it.label + '｜' + it.text;
+        const rec = Object.assign({locale: loc.name}, it);
+        if(!worst[it.label] || it.over > worst[it.label].over) worst[it.label] = rec;
+      });
+      report.push({loc: loc, items: items, untranslated: untranslated});
+    }
+    win.__i18n.clearPseudo(); win.__i18n.setLang('ja');
+    lqaIssues = Object.keys(worst).map(k => worst[k]);
+  }catch(e){
+    $('#lqaBody').innerHTML = '<div class="msg" style="padding:30px 0">計測に失敗しました: ' + esc(e.message) + '</div>';
+    fr.remove(); lqaRunning = false; return;
+  }
+  fr.remove();
+  lqaRunning = false;
+  if(token !== playToken) return;
+
+  renderLqaReport(report);
+}
+
+function renderLqaReport(report){
+  let totalOver = 0, totalUntr = 0;
+  let html = '';
+  report.forEach(rd => {
+    totalOver += rd.items.length;
+    totalUntr += rd.untranslated.length;
+    html += '<div class="lqaLoc"><h4>' + esc(rd.loc.name);
+    if(rd.items.length) html += ' <span class="cnt">不具合 ' + rd.items.length + '件</span>';
+    else html += ' <span class="cnt ok">はみ出しなし</span>';
+    html += '</h4>';
+    rd.items.forEach(it => {
+      const widen = it.need + it.pad * 2;
+      const ratio = (it.box / it.need);
+      const newFont = Math.max(1, Math.round(it.font * ratio));
+      const maxChars = Math.max(1, Math.floor(it.text.length * it.box / it.need));
+      html += '<div class="lqaItem">'
+        + '<div class="hd">' + esc(it.label) + '：「' + esc(it.text) + '」</div>'
+        + '<div class="nums">必要 ' + it.need + 'px ／ 枠 ' + it.box + 'px → <b>' + it.over + 'px はみ出し</b></div>'
+        + '<ol>'
+        + '<li>枠を ' + widen + 'px まで広げる</li>'
+        + '<li>フォントを ' + ratio.toFixed(2) + '倍に下げる（' + it.font + 'px → ' + newFont + 'px）</li>'
+        + '<li>文字列を ' + maxChars + ' 文字以内に短くする</li>'
+        + '</ol></div>';
+    });
+    if(rd.untranslated.length){
+      html += '<div class="lqaUntr">未翻訳の残り: ' + rd.untranslated.map(k => '<span>STRINGS.' + esc(k) + '</span>').join('、') + '</div>';
+    }
+    html += '</div>';
+  });
+  if(totalOver === 0 && totalUntr === 0){
+    html = '<div class="msg" style="padding:30px 0">検出された表示不具合はありません。<br>全言語で枠に収まり、未翻訳もありませんでした。</div>';
+  }
+  $('#lqaBody').innerHTML = html;
+  $('#lqaFix').style.display = lqaIssues.length ? 'block' : 'none';
+}
+
+async function runLocaleFix(){
+  if(!current || !current.id || !lqaIssues.length || lqaRunning) return;
+  const token = playToken;
+  const issues = lqaIssues.slice();
+  $('#lqaFix').style.display = 'none';
+  $('#lqaBody').innerHTML = '<div class="msg" style="padding:30px 0">AIが枠・フォントを調整中… 30秒〜1分かかります</div>';
+  try{
+    const d = await post('/api/fix/' + current.id + '/locale', {issues});
+    if(token !== playToken) return;
+    current.html = d.html;
+    current.canUndo = true;
+    updatePbar();
+    $('#frame').srcdoc = d.html;
+    // 記録も還流（作り込み時に再発防止として渡る）
+    try{ await post('/api/saved/' + current.id + '/issues',
+      {issues: issues.map(it => it.locale + '「' + it.text + '」が枠に収まらない（必要' + it.need + 'px/枠' + it.box + 'px）')}); }catch(e){}
+    $('#lqaBody').innerHTML = '<div class="msg" style="padding:30px 0">調整しました。再チェックします…</div>';
+    runLocaleCheck();
+  }catch(e){
+    if(token !== playToken) return;
+    $('#lqaBody').innerHTML = '<div class="msg" style="padding:30px 0">修正に失敗しました: ' + esc(e.message) + '</div>';
+    $('#lqaFix').style.display = 'block';
+  }
+}
+
+$('#lqaBtn').onclick = runLocaleCheck;
+$('#lqaFix').onclick = runLocaleFix;
+$('#lqaClose').onclick = () => $('#lqaPanel').classList.remove('on');
+
+/* ---- 元に戻す ---- */
+$('#undoBtn').onclick = async () => {
+  if(!current || !current.id) return;
+  const token = playToken;
+  try{
+    const d = await post('/api/saved/' + current.id + '/undo');
+    if(token !== playToken) return;
+    current.html = d.html;
+    current.canUndo = d.can_undo;
+    updatePbar();
+    $('#frame').srcdoc = d.html;
+    fixStatus('直前の状態に戻しました。もう一度押すとやり直しになります。');
+  }catch(e){
+    if(token !== playToken) return;
+    fixStatus('戻せませんでした: ' + e.message);
+  }
+};
+
+/* ---- イベント ---- */
+$('#go').onclick = loadIdeas;
+$('#theme').addEventListener('keydown', e => { if(e.key === 'Enter') loadIdeas(); });
+$('#back').onclick = () => {
+  playToken++;
+  clearInterval(refineTimer);
+  $('#refine').disabled = false;
+  $('#fixSend').disabled = false;
+  closeFixPanel();
+  hideVbar();
+  $('#lqaPanel').classList.remove('on');
+  $('#player').classList.remove('on');
+  $('#frame').srcdoc = '';
+  current = null;
+  if(view === 'saved') loadSaved();  // バッジや版の追加を反映
+};
+
+/* ---- 起動時: 直近のアイデアを自動復元 ---- */
+(async function restoreLastRound(){
+  try{
+    const d = await get('/api/ideas/history?limit=1');
+    if(view === 'ideas' && !lastIdeas && d.rounds.length){
+      const rd = d.rounds[0];
+      lastIdeas = rd.ideas || [];
+      roundKey = rd.at || '';
+      $('#theme').value = rd.theme || '';
+      render(lastIdeas);
+    }
+  }catch(e){ /* サーバー未起動時などは既定の案内文のまま */ }
+})();
+</script>
+</body>
+</html>

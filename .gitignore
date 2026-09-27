@@ -1,0 +1,23 @@
+# 生成物・実行時データ（公開しない）
+saved/*
+!saved/.gitkeep
+
+# 秘密情報（APIキーなど）— 絶対にコミットしない
+.env
+.env.*
+*.key
+secrets.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# エディタ / OS / ローカル設定
+.claude/settings.local.json
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
